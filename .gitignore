@@ -1,0 +1,31 @@
+# Keil MDK
+*.uvguix.*
+*.uvoptx
+*.scvd
+Listings/
+Objects/
+*.hex
+*.axf
+*.o
+*.d
+*.crf
+*.lnp
+*.lst
+*.dep
+
+# Proteus
+*.pdsprj.bak
+*.pdsprj.*.workspace
+Project Backups/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# Claude
+.claude/

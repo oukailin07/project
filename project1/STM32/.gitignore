@@ -1,0 +1,26 @@
+# Keil build output
+Objects/
+Listings/
+DebugConfig/
+
+# User-specific files
+*.uvguix.*
+
+# Compiled objects
+*.o
+*.crf
+*.d
+*.lst
+*.axf
+*.hex
+*.htm
+*.lnp
+*.sct
+*.dep
+*.iex
+*.tra
+*.bak
+
+# IDE temp
+*.uvoptx
+JLinkLog.txt
