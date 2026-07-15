@@ -2,8 +2,8 @@
  * hc_sr04.h - HC-SR04 超声波测距模块驱动
  *
  * 硬件: STM32F103C8
- * TRIG: PA0  (GPIO 推挽输出)
- * ECHO: PA1  (GPIO 浮空输入)
+ * TRIG: PB4  (GPIO 推挽输出)
+ * ECHO: PB3  (GPIO 浮空输入)
  *
  * 工作原理:
  *   1. TRIG 发送 10us 高电平脉冲
@@ -20,10 +20,10 @@
 #include "sys.h"
 
 /* ── 引脚定义 ───────────────────────────────────────── */
-#define HC_TRIG_PORT    GPIOA
-#define HC_TRIG_PIN     GPIO_Pin_0
-#define HC_ECHO_PORT    GPIOA
-#define HC_ECHO_PIN     GPIO_Pin_1
+#define HC_TRIG_PORT    GPIOB
+#define HC_TRIG_PIN     GPIO_Pin_4
+#define HC_ECHO_PORT    GPIOB
+#define HC_ECHO_PIN     GPIO_Pin_3
 
 #define HC_TRIG_H()     GPIO_SetBits(HC_TRIG_PORT, HC_TRIG_PIN)
 #define HC_TRIG_L()     GPIO_ResetBits(HC_TRIG_PORT, HC_TRIG_PIN)

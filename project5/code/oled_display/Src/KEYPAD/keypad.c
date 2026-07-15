@@ -1,8 +1,8 @@
 /**
  * keypad.c - 4×4 矩阵按键模块驱动
  *
- * 行线(ROW): PB4, PB5, PB6, PB7  — 推挽输出
- * 列线(COL): PB8, PB9, PB14, PB15 — 上拉输入
+ * 行线(ROW): PA11, PA10, PA9, PA8  — 推挽输出
+ * 列线(COL): PB15, PB14, PB13, PB12 — 上拉输入
  *
  * 逐行扫描: 依次将每行拉低，读取列状态，
  *           若某列为低电平则该键按下。
@@ -42,22 +42,22 @@ static const u16 col_pins[4] = {
 
 /**
  * @brief  初始化 4×4 矩阵按键 GPIO
- *         行线: 推挽输出, 默认高电平
- *         列线: 上拉输入
+ *         行线(PA11~PA8): 推挽输出, 默认高电平
+ *         列线(PB15~PB12): 上拉输入
  */
 void KEYPAD_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure;
 
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA | RCC_APB2Periph_GPIOB, ENABLE);
 
-    /* 行线: PB4~PB7, 推挽输出 */
+    /* 行线: PA11~PA8, 推挽输出 */
     GPIO_InitStructure.GPIO_Pin   = KP_ROW_PINS;
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(KP_ROW_PORT, &GPIO_InitStructure);
 
-    /* 列线: PB8,PB9,PB14,PB15, 上拉输入 */
+    /* 列线: PB15~PB12, 上拉输入 */
     GPIO_InitStructure.GPIO_Pin  = KP_COL_PINS;
     GPIO_InitStructure.GPIO_Mode = GPIO_Mode_IPU;
     GPIO_Init(KP_COL_PORT, &GPIO_InitStructure);

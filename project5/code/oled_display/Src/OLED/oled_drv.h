@@ -2,7 +2,7 @@
  * oled_drv.h - SSD1306 OLED I2C 底层驱动（软件模拟IIC）
  *
  * 硬件: STM32F103C8
- * I2C引脚: SCL-PB12, SDA-PB13
+ * I2C引脚: SCL-PB6, SDA-PB7
  *
  * 本文件仅负责物理层 I2C 通信和 OLED 硬件初始化。
  * 上层显示函数请使用 oled_disp.h
@@ -14,8 +14,8 @@
 #include "sys.h"
 
 /* ── I2C 引脚宏定义 ─────────────────────────────────── */
-#define OLED_SCL_PIN    GPIO_Pin_12   /* PB12 */
-#define OLED_SDA_PIN    GPIO_Pin_13   /* PB13 */
+#define OLED_SCL_PIN    GPIO_Pin_6    /* PB6 */
+#define OLED_SDA_PIN    GPIO_Pin_7    /* PB7 */
 #define OLED_GPIO_PORT  GPIOB
 
 #define OLED_SCLK_Clr() GPIO_ResetBits(OLED_GPIO_PORT, OLED_SCL_PIN)

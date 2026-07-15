@@ -1,18 +1,26 @@
 /**
- * OLED 显示节点 — 超声波测距 + 电机控制终端
- * 硬件: STM32F103C8
+ * OLED 显示节点 — 超声波测距 + 风扇控制终端
  *
- * 外设:
- *   OLED  : SCL-PB12, SDA-PB13   (SSD1306, I2C 软件模拟)
- *   HC-SR04: TRIG-PA0, ECHO-PA1  (超声波测距)
- *   矩阵键盘: ROW-PB4~PB7, COL-PB8,PB9,PB14,PB15 (4×4)
- *   L298N : ENA-PA2, IN1-PB0, IN2-PB1, ENB-PA3, IN3-PB10, IN4-PB11
+ * 硬件平台: LCKFB-DKX-STM32F103C8T6 (立创·地阔星 开发板)
+ *   - 🔴 板载红色LED: PA1 (高电平点亮, 串联1kΩ)
+ *   - 🟢 板载绿色LED: PA2 (高电平点亮, 串联1kΩ, 与L298N ENA共用PWM)
+ *   - 板载USB-C: D-=PA11, D+=PA12
+ *   - SWD调试: PA13(SWDIO), PA14(SWCLK)
+ *   - BOOT0/BOOT1 独立跳线帽, 不在主排针上
  *
- * 功能: HC-SR04 实时测距 + 按键控制电机 + OLED 显示
+ * 外设接线 (参考排针丝印):
+ *   OLED  : SCL-PB6, SDA-PB7           (SSD1306, 软件模拟I2C)
+ *   HC-SR04: TRIG-PB4, ECHO-PB3         (超声波测距, PB3需禁用JTAG)
+ *   矩阵键盘: ROW-PA11/PA10/PA9/PA8, COL-PB15/PB14/PB13/PB12 (4×4)
+ *   L298N : ENA-PA2, IN1-PB10, IN2-PB11 (单风扇, PB10/PB11为5V耐受)
+ *
+ * 功能: HC-SR04 实时测距 + 按键控制风扇 + OLED 显示
  *   按键控制:
- *     [A] 电机A正转   [B] 电机A反转
- *     [C] 电机B正转   [D] 电机B反转
- *     [#] 全部停止
+ *     [A] 风扇正转   [B] 风扇反转
+ *     [#] 风扇停止
+ *
+ * 注意: PA2同时用作L298N PWM输出和板载绿色LED →
+ *        风扇转动时绿色LED亮度随PWM变化, 属正常现象
  */
 
 #include "stm32f10x.h"
@@ -25,22 +33,21 @@
 
 /* ── 刷新周期（每 10ms 循环一次 → 50 次 = 500ms）── */
 #define REFRESH_TICKS   50
-#define MOTOR_SPEED     50    /* 默认电机转速 50% */
+#define MOTOR_SPEED     50    /* 默认风扇转速 50% */
 
 int main(void)
 {
     char    line_buf[32];
     float   distance = 0.0f;
     char    key;
-    s8      motor_a = 0;
-    s8      motor_b = 0;
+    s8      motor = 0;
     u8      tick = 0;
 
     /* ── 初始化所有外设 ──────────────────────────────── */
     delay_init();
     OLED_Init();
     OLED_Clear();
-    HC_SR04_Init();
+    HC_SR04_Init();     /* 内部处理 PB3 JTAG 重映射 */
     KEYPAD_Init();
     L298N_Init();
 
@@ -48,11 +55,11 @@ int main(void)
     OLED_ShowString(0, 0, (u8 *)"HC-SR04 Range", 16);
     OLED_ShowString(0, 2, (u8 *)"Dist: ---.-cm", 16);
     OLED_ShowString(0, 4, (u8 *)"Key: --", 16);
-    OLED_ShowString(0, 6, (u8 *)"Motor: Stop   ", 16);
+    OLED_ShowString(0, 6, (u8 *)"Fan: Stop     ", 16);
 
     while (1)
     {
-        /* ── 按键扫描 + 电机控制 ──────────────────────── */
+        /* ── 按键扫描 + 风扇控制 ──────────────────────── */
         key = KEYPAD_Scan();
         if (key != '\0')
         {
@@ -62,38 +69,19 @@ int main(void)
             switch (key)
             {
             case 'A':
-                motor_a =  MOTOR_SPEED;
-                motor_b =  0;
-                L298N_MotorA_Set(motor_a);
-                L298N_MotorB_Stop();
-                OLED_ShowString(0, 6, (u8 *)"Motor: A Fwd  ", 16);
+                motor = MOTOR_SPEED;
+                L298N_Motor_Set(motor);
+                OLED_ShowString(0, 6, (u8 *)"Fan: Fwd      ", 16);
                 break;
             case 'B':
-                motor_a = -MOTOR_SPEED;
-                motor_b =  0;
-                L298N_MotorA_Set(motor_a);
-                L298N_MotorB_Stop();
-                OLED_ShowString(0, 6, (u8 *)"Motor: A Rev  ", 16);
-                break;
-            case 'C':
-                motor_b =  MOTOR_SPEED;
-                motor_a =  0;
-                L298N_MotorB_Set(motor_b);
-                L298N_MotorA_Stop();
-                OLED_ShowString(0, 6, (u8 *)"Motor: B Fwd  ", 16);
-                break;
-            case 'D':
-                motor_b = -MOTOR_SPEED;
-                motor_a =  0;
-                L298N_MotorB_Set(motor_b);
-                L298N_MotorA_Stop();
-                OLED_ShowString(0, 6, (u8 *)"Motor: B Rev  ", 16);
+                motor = -MOTOR_SPEED;
+                L298N_Motor_Set(motor);
+                OLED_ShowString(0, 6, (u8 *)"Fan: Rev      ", 16);
                 break;
             case '#':
-                motor_a = 0;
-                motor_b = 0;
-                L298N_Stop();
-                OLED_ShowString(0, 6, (u8 *)"Motor: Stop   ", 16);
+                motor = 0;
+                L298N_Motor_Stop();
+                OLED_ShowString(0, 6, (u8 *)"Fan: Stop     ", 16);
                 break;
             default:
                 break;

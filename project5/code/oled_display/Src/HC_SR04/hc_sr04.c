@@ -2,8 +2,8 @@
  * hc_sr04.c - HC-SR04 超声波测距模块驱动
  *
  * 使用 GPIO 轮询 + delay_us 延时实现测距。
- * TRIG: PA0  — 10us 触发脉冲输出
- * ECHO: PA1  — 回波脉宽测量输入
+ * TRIG: PB4  — 10us 触发脉冲输出
+ * ECHO: PB3  — 回波脉宽测量输入
  *
  * 距离(cm) = 回波脉宽(us) / 58
  */
@@ -17,22 +17,29 @@
 
 /**
  * @brief  初始化 HC-SR04 GPIO 引脚
- *         TRIG → PA0, 推挽输出
- *         ECHO → PA1, 浮空输入
+ *         TRIG → PB4, 推挽输出
+ *         ECHO → PB3, 浮空输入
+ *
+ * @note   PB3 默认用作 JTDO (JTAG)，作为 GPIO 使用前
+ *         需要先禁用 JTAG 并开启 AFIO 时钟重映射。
+ *         此操作在 main() 中完成 (GPIO_PinRemapConfig)。
  */
 void HC_SR04_Init(void)
 {
     GPIO_InitTypeDef GPIO_InitStructure;
 
-    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB | RCC_APB2Periph_AFIO, ENABLE);
 
-    /* TRIG 引脚: PA0, 推挽输出 */
+    /* 禁用 JTAG，释放 PB3/PB4 为普通 GPIO */
+    GPIO_PinRemapConfig(GPIO_Remap_SWJ_JTAGDisable, ENABLE);
+
+    /* TRIG 引脚: PB4, 推挽输出 */
     GPIO_InitStructure.GPIO_Pin   = HC_TRIG_PIN;
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_Out_PP;
     GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;
     GPIO_Init(HC_TRIG_PORT, &GPIO_InitStructure);
 
-    /* ECHO 引脚: PA1, 浮空输入 */
+    /* ECHO 引脚: PB3, 浮空输入 */
     GPIO_InitStructure.GPIO_Pin   = HC_ECHO_PIN;
     GPIO_InitStructure.GPIO_Mode  = GPIO_Mode_IN_FLOATING;
     GPIO_Init(HC_ECHO_PORT, &GPIO_InitStructure);

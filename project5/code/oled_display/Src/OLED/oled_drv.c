@@ -3,8 +3,8 @@
  *
  * 硬件: STM32F103C8
  * OLED  : SSD1306, 128×64, I2C 接口
- * SCL   : PB12
- * SDA   : PB13
+ * SCL   : PB6
+ * SDA   : PB7
  */
 
 #include "oled_drv.h"
@@ -139,7 +139,7 @@ void OLED_Display_Off(void)
 /**
  * @brief  初始化 SSD1306 OLED（I2C 软件模拟）
  *
- * 配置 GPIOB 12/13 为推挽输出，然后发送 SSD1306 初始化序列。
+ * 配置 GPIOB 6/7 为推挽输出，然后发送 SSD1306 初始化序列。
  */
 void OLED_Init(void)
 {
