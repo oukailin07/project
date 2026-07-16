@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define></Define>
               <Undefine></Undefine>
-              <IncludePath>.\Src\LED;.\SYSTEM\delay;.\SYSTEM\sys;.\SYSTEM\usart;.\Src\OLED;.\Src\KEYPAD;.\Src\HC_SR04;.\Src\L298N</IncludePath>
+              <IncludePath>.\Src\LED;.\SYSTEM\delay;.\SYSTEM\sys;.\SYSTEM\usart;.\Src\OLED;.\Src\KEYPAD;.\Src\HC_SR04;.\Src\L298N;.\Src\PID</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -452,6 +452,16 @@
               <FileName>l298n.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\Src\L298N\l298n.h</FilePath>
+            </File>
+            <File>
+              <FileName>pid.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Src\PID\pid.c</FilePath>
+            </File>
+            <File>
+              <FileName>pid.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Src\PID\pid.h</FilePath>
             </File>
           </Files>
         </Group>

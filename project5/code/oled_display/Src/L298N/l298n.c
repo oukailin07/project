@@ -15,10 +15,8 @@
 #define MOTOR_IN2_H()   GPIO_SetBits(L298N_IN2_PORT, L298N_IN2_PIN)
 #define MOTOR_IN2_L()   GPIO_ResetBits(L298N_IN2_PORT, L298N_IN2_PIN)
 
-/* ── PWM 参数 ────────────────────────────────────────── */
-#define PWM_PSC       (72 - 1)   /* 72MHz / 72 = 1MHz 计数频率 */
-#define PWM_ARR       (1000 - 1) /* 1MHz / 1000 = 1kHz PWM */
-#define PWM_MAX       1000       /* 最大占空比对应 100% */
+/* ── PWM 参数 (动态计算预分频, 兼容 72M/64M/8M 各种时钟) ── */
+/* 计数器频率 = 1MHz → PWM = 1kHz @ ARR=999, 分辨率 0.1%      */
 
 /**
  * @brief  初始化 L298N 控制引脚和 TIM2 PWM
@@ -57,9 +55,9 @@ void L298N_Init(void)
     MOTOR_IN1_L();
     MOTOR_IN2_L();
 
-    /* ── TIM2 时基配置 ───────────────────────────────── */
-    TIM_TimeBaseStructure.TIM_Period        = PWM_ARR;
-    TIM_TimeBaseStructure.TIM_Prescaler     = PWM_PSC;
+    /* ── TIM2 时基: 动态预分频 → 1MHz 计数, PWM=1kHz ── */
+    TIM_TimeBaseStructure.TIM_Period        = 999;     /* ARR=999 → 1kHz */
+    TIM_TimeBaseStructure.TIM_Prescaler     = (uint16_t)((SystemCoreClock / 1000000U) - 1U);
     TIM_TimeBaseStructure.TIM_ClockDivision = 0;
     TIM_TimeBaseStructure.TIM_CounterMode   = TIM_CounterMode_Up;
     TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
@@ -88,7 +86,7 @@ void L298N_Motor_Set(s8 speed)
         /* 正转 */
         MOTOR_IN1_H();
         MOTOR_IN2_L();
-        TIM_SetCompare3(TIM2, (u16)speed * 10);
+        TIM_SetCompare3(TIM2, (u16)speed * 10);  /* speed 0~100 → CCR 0~1000 */
     }
     else if (speed < 0)
     {

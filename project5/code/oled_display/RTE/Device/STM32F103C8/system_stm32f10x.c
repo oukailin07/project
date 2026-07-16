@@ -112,7 +112,7 @@
 /* #define SYSCLK_FREQ_36MHz  36000000 */
 /* #define SYSCLK_FREQ_48MHz  48000000 */
 /* #define SYSCLK_FREQ_56MHz  56000000 */
-#define SYSCLK_FREQ_72MHz  72000000
+// #define SYSCLK_FREQ_72MHz  72000000  // disabled: use HSI 8MHz for Proteus
 #endif
 
 /*!< Uncomment the following line if you need to use external SRAM mounted
@@ -1074,8 +1074,39 @@ static void SetSysClockTo72(void)
     }
   }
   else
-  { /* If HSE fails to start-up, the application will have wrong clock 
-         configuration. User can add here some code to deal with this error */
+  { /* HSE failed — fall back to HSI+PLL (64 MHz)
+         PLL source = HSI/2 = 4 MHz, multiplier = 16 → 64 MHz
+         Works in Proteus without external crystal — no HSE needed */
+
+    /* Flash 2 wait state (required for >48MHz) */
+    FLASH->ACR |= FLASH_ACR_PRFTBE;
+    FLASH->ACR &= (uint32_t)((uint32_t)~FLASH_ACR_LATENCY);
+    FLASH->ACR |= (uint32_t)FLASH_ACR_LATENCY_2;
+
+    /* HCLK = SYSCLK, PCLK2 = HCLK, PCLK1 = HCLK/2 */
+    RCC->CFGR |= (uint32_t)(RCC_CFGR_HPRE_DIV1  |
+                            RCC_CFGR_PPRE2_DIV1 |
+                            RCC_CFGR_PPRE1_DIV2);
+
+    /* PLL: HSI/2 × 16 = 64 MHz */
+    RCC->CFGR &= (uint32_t)(~(RCC_CFGR_PLLSRC | RCC_CFGR_PLLXTPRE | RCC_CFGR_PLLMULL));
+    RCC->CFGR |= (uint32_t)(RCC_CFGR_PLLSRC_HSI_Div2 | RCC_CFGR_PLLMULL16);
+
+    /* Enable PLL */
+    RCC->CR |= RCC_CR_PLLON;
+    while ((RCC->CR & RCC_CR_PLLRDY) == 0)
+    {
+    }
+
+    /* Select PLL as system clock */
+    RCC->CFGR &= (uint32_t)(~(RCC_CFGR_SW));
+    RCC->CFGR |= (uint32_t)RCC_CFGR_SW_PLL;
+    while ((RCC->CFGR & RCC_CFGR_SWS) != (uint32_t)0x08)
+    {
+    }
+
+    /* Update global clock variable so delay_us/ms use correct timing */
+    SystemCoreClock = 64000000;
   }
 }
 #endif
