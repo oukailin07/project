@@ -1,8 +1,10 @@
 /**
- * buzzer.h - 蜂鸣器抽象接口
+ * buzzer.h - 无源蜂鸣器 PWM 驱动接口 (TIM2_CH2, PA1)
  *
- * 职责: 蜂鸣器硬件控制，支持开关和模式响铃。
- * 移植: 修改 main.h 中的 BUZZER_PIN 宏。
+ * 无源蜂鸣器没有内部振荡电路，需要 PWM 方波信号才能发声。
+ * 本模块使用 TIM2 通道2 输出 2kHz PWM 驱动无源蜂鸣器。
+ *
+ * 移植: 若改用其他定时器/通道，修改 main.h 中的宏及 buzzer.c 的 Init。
  */
 
 #ifndef __BUZZER_H
@@ -14,10 +16,9 @@
 void Buzzer_Init(void);
 void Buzzer_On(void);
 void Buzzer_Off(void);
-void Buzzer_Toggle(void);
 
 /**
- * Buzzer_Beep - 模式响铃
+ * Buzzer_Beep - 模式响铃 (阻塞)
  * @times:       响铃次数
  * @duration_ms: 每次响铃/间隔时间 (ms)
  *

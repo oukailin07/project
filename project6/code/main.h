@@ -20,8 +20,9 @@
 #define LED_Y_PIN       PBout(5)    /* 黄灯: PB5 */
 #define LED_G_PIN       PBout(3)    /* 绿灯: PB3 (需禁用JTAG) */
 
-/* --- 蜂鸣器 (高电平触发) --- */
-#define BUZZER_PIN      PAout(1)    /* 蜂鸣器: PA1 */
+/* --- 蜂鸣器 (无源, TIM2_CH2 PWM 驱动) --- */
+#define BUZZER_PORT     GPIOA
+#define BUZZER_PIN_NUM  GPIO_Pin_1    /* 蜂鸣器: PA1 → TIM2_CH2 */
 
 /* --- 震动马达 (高电平震动) --- */
 #define VIBRATOR_PIN    PBout(12)   /* 震动马达: PB12 */
