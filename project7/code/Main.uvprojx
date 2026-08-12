@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>APM32F103xB</Define>
               <Undefine></Undefine>
-              <IncludePath>.;.\SYSTEM\sys;.\SYSTEM\usart;.\SYSTEM\delay;.\Src\JY61P;.\Src\LED;.\Src\Buzzer;.\Src\Motor;.\Src\Posture;.\Libraries\APM32F10x_StdPeriphDriver\inc;.\Libraries\CMSIS\Core\Include;.\Libraries\Device\Geehy\APM32F10x\Include</IncludePath>
+              <IncludePath>.;.\SYSTEM\sys;.\SYSTEM\usart;.\SYSTEM\delay;.\Src\JY61P;.\Src\LED;.\Src\Buzzer;.\Src\Motor;.\Src\Posture;.\Libraries\APM32F10x_StdPeriphDriver\inc;.\Libraries\CMSIS\Core\Include;.\Libraries\Device\Geehy\APM32F10x\Include;.\SYSTEM\usart2</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -437,6 +437,11 @@
               <FileName>delay.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\SYSTEM\delay\delay.c</FilePath>
+            </File>
+            <File>
+              <FileName>usart2.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\SYSTEM\usart2\usart2.c</FilePath>
             </File>
           </Files>
         </Group>

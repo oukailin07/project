@@ -20,6 +20,7 @@
 #include "Src/Buzzer/buzzer.h"
 #include "Src/Motor/vibrator.h"
 #include "Src/Posture/posture_detect.h"
+#include "SYSTEM/usart2/usart2.h"
 
 /* ================================================================
  * 闪烁/定时常量
@@ -41,10 +42,12 @@ int main(void)
     Buzzer_Init();                  /* 蜂鸣器 (PA1) */
     Vibrator_Init();                /* 震动马达 (PB12) */
     JY61P_Init();                   /* JY61P 传感器 (USART1: PA9/PA10, 9600bps) */
+    usart2_init(USART2_BAUDRATE);   /* USART2 日志输出 (PA2/PA3, 921600bps) */
     Posture_Init();                 /* 姿态检测状态机 */
 
     /* --- 输出时序变量 --- */
     uint32_t flash_timer_ms  = 0;   /* 闪烁计时器 (累计到半周期时翻转) */
+    uint32_t log_timer_ms    = 0;   /* USART2 日志发送计时器 */
     uint8_t  yellow_on = 0;         /* 黄灯当前亮灭状态 */
     uint8_t  red_on    = 0;         /* 红灯当前亮灭状态 */
 
@@ -64,6 +67,7 @@ int main(void)
 
         /* 累计闪烁计时器 */
         flash_timer_ms  += MAIN_LOOP_PERIOD;
+        log_timer_ms    += MAIN_LOOP_PERIOD;
 
         /* --- 根据姿态状态控制输出 --- */
         switch (ps)
@@ -122,6 +126,13 @@ int main(void)
                 LED_Set(LED_RED, red_on ? LED_ON : LED_OFF);
             }
             break;
+        }
+
+        /* --- USART2 日志: 发送俯仰角 + 姿态状态到 lksscope --- */
+        if (log_timer_ms >= USART2_LOG_PERIOD) {
+            log_timer_ms = 0;
+            /* 格式: pitch,state (state: 0=站立中 1=直立 2=25°告警 3=35°告警) */
+            USART2_SendData(pitch, (uint8_t)ps);
         }
 
         /* 10ms 循环周期 */
