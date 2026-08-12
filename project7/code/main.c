@@ -54,10 +54,11 @@ int main(void)
     /* --- 主循环 (100Hz) --- */
     while (1)
     {
-        /* 读取俯仰角 (JY61P 内部自动处理缓冲和解析)
-         * 坐标校准: 传感器默认横放=0°竖放=90°, 变换为竖放=0°横放=90°
-         * 变换后 pitch 表示"偏离竖直方向的角度", 站直=0° */
-        pitch = 90.0f - JY61P_GetPitch();
+        /* 读取 PCB 板面前倾角 (基于加速度计重力矢量, 无万向节死锁)
+         * JY61P_GetForwardLean() 直接从 Ax/Az 重力分量计算:
+         *   atan2(-az, ax) → 只取 XZ 平面(前后方向), 忽略 Y 轴(左右侧倾)
+         *   站直=0°, 前倾>0°, 后倾<0° */
+        pitch = JY61P_GetForwardLean();
 
         /* 姿态检测状态机更新 (10ms 周期) */
         Posture_Update(pitch, MAIN_LOOP_PERIOD);

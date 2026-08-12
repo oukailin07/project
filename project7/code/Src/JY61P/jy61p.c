@@ -14,6 +14,8 @@
 #include "apm32f10x_rcm.h"
 #include "apm32f10x_usart.h"
 
+#include <math.h>   /* atan2f */
+
 /* ================================================================
  * 环形接收缓冲区
  * ================================================================ */
@@ -24,7 +26,7 @@ static volatile uint16_t rx_tail = 0;   /* 主循环读取位置 */
 /* ================================================================
  * 解析状态机
  * ================================================================ */
-static JY61P_Data_t g_jy61p_data;
+JY61P_Data_t g_jy61p_data;
 
 /* 解析状态 */
 typedef enum {
@@ -120,13 +122,13 @@ static void parse_byte(uint8_t byte)
         break;
 
     case PARSE_WAIT_TYPE:
-        if (byte == JY61P_TYPE_ANGLE) {
-            /* 只解析角度包 (0x53), 其他包类型丢弃 */
+        if (byte == JY61P_TYPE_ANGLE || byte == JY61P_TYPE_ACCEL) {
+            /* 接受角度包 (0x53) 和加速度包 (0x51) */
             parse_buf[1] = byte;
             parse_idx = 2;
             parse_state = PARSE_DATA;
         } else {
-            /* 非角度包, 回到等待包头状态 */
+            /* 非目标包类型, 回到等待包头状态 */
             parse_state = PARSE_WAIT_HEAD;
         }
         break;
@@ -143,15 +145,32 @@ static void parse_byte(uint8_t byte)
             }
 
             if (sum == parse_buf[JY61P_PACKET_LEN - 1]) {
-                /* 校验通过, 解析角度值 */
-                int16_t roll_raw  = parse_int16(parse_buf[2], parse_buf[3]);
-                int16_t pitch_raw = parse_int16(parse_buf[4], parse_buf[5]);
-                int16_t yaw_raw   = parse_int16(parse_buf[6], parse_buf[7]);
+                /* 校验通过, 根据包类型解析 */
+                uint8_t pkt_type = parse_buf[1];
 
-                g_jy61p_data.roll  = (float)roll_raw  / 32768.0f * 180.0f;
-                g_jy61p_data.pitch = (float)pitch_raw / 32768.0f * 180.0f;
-                g_jy61p_data.yaw   = (float)yaw_raw   / 32768.0f * 180.0f;
-                g_jy61p_data.fresh = 1;
+                if (pkt_type == JY61P_TYPE_ANGLE) {
+                    /* 角度包 (0x53): Roll/Pitch/Yaw */
+                    int16_t roll_raw  = parse_int16(parse_buf[2], parse_buf[3]);
+                    int16_t pitch_raw = parse_int16(parse_buf[4], parse_buf[5]);
+                    int16_t yaw_raw   = parse_int16(parse_buf[6], parse_buf[7]);
+
+                    g_jy61p_data.roll  = (float)roll_raw  / 32768.0f * 180.0f;
+                    g_jy61p_data.pitch = (float)pitch_raw / 32768.0f * 180.0f;
+                    g_jy61p_data.yaw   = (float)yaw_raw   / 32768.0f * 180.0f;
+                    g_jy61p_data.fresh = 1;
+                }
+                else if (pkt_type == JY61P_TYPE_ACCEL) {
+                    /* 加速度包 (0x51): Ax/Ay/Az + Temperature
+                     * 满量程 ±2g, 32768 = 2g, 1g = 16384 LSB */
+                    int16_t ax_raw = parse_int16(parse_buf[2], parse_buf[3]);
+                    int16_t ay_raw = parse_int16(parse_buf[4], parse_buf[5]);
+                    int16_t az_raw = parse_int16(parse_buf[6], parse_buf[7]);
+
+                    g_jy61p_data.ax = (float)ax_raw / JY61P_ACCEL_1G;
+                    g_jy61p_data.ay = (float)ay_raw / JY61P_ACCEL_1G;
+                    g_jy61p_data.az = (float)az_raw / JY61P_ACCEL_1G;
+                    g_jy61p_data.accel_fresh = 1;
+                }
             }
             /* 校验失败则丢弃本包, 不影响之前的数据 */
 
@@ -194,6 +213,44 @@ float JY61P_GetYaw(void)
 {
     JY61P_Process();
     return g_jy61p_data.yaw;
+}
+
+/**
+ * JY61P_GetForwardLean - 从加速度矢量计算 PCB 板面俯仰角
+ *
+ * 为什么不用 Euler 角的 pitch:
+ *   当 PCB 垂直于水平面时 (pitch ≈ 90°), Euler 角处于万向节死锁点附近,
+ *   此时 roll 和 pitch 产生耦合 — 左右侧倾会"泄漏"到 pitch 读数中,
+ *   导致 pitch 无法准确反映 PCB 板面的前倾角度。
+ *
+ * 解决方案:
+ *   直接从加速度计 (重力矢量) 的 XZ 平面投影计算前倾角,
+ *   天然忽略 Y 轴 (左右方向), 无万向节死锁问题。
+ *
+ * 公式:
+ *   forward_lean = atan2(-az, ax)
+ *   - ax: 沿传感器 X 轴的重力分量 (站立时沿脊柱方向, ≈ +1g)
+ *   - az: 沿传感器 Z 轴的重力分量 (站立时前后方向, ≈ 0g)
+ *   - ay 不参与 → 侧边倾斜不影响结果
+ *
+ * 返回值语义 (与 main.c 现有逻辑兼容):
+ *   0°  = 站直 (PCB 竖直, 板面垂直于水平面)
+ *   >0° = 前倾 (PCB 板面偏离竖直方向)
+ *   <0° = 后倾
+ */
+float JY61P_GetForwardLean(void)
+{
+    JY61P_Process();    /* 先处理缓冲区的所有字节 */
+
+    float ax = g_jy61p_data.ax;
+    float az = g_jy61p_data.az;
+
+    /* atan2(-az, -ax):
+     *   X+ 指向下方 → 站直时 ax≈-g, 需取反才能得到正确角度
+     *   站直:  az=0,  ax≈-g  → atan2(0, +g)  →  0°
+     *   前倾:  az<0, ax≈-g  → atan2(+量, +量) → +角度
+     *   后倾:  az>0, ax≈-g  → atan2(-量, +量) → -角度 */
+    return atan2f(-az, -ax) * (180.0f / 3.14159265359f);
 }
 
 uint8_t JY61P_DataReady(void)
