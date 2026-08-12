@@ -62,40 +62,46 @@ void Posture_Init(void)
  * 判断辅助函数
  * ================================================================ */
 
-/* 是否处于直立姿态 (|pitch| < POSTURE_STAND_MAX) */
+/* 是否处于直立姿态 (|pitch| ≤ POSTURE_STAND_MAX, 前后对称) */
 static inline int is_standing(float pitch)
 {
-    return (pitch >= -POSTURE_STAND_MAX && pitch <= POSTURE_STAND_MAX);
+    float abs_p = pitch > 0 ? pitch : -pitch;
+    return (abs_p <= POSTURE_STAND_MAX);
 }
 
-/* 是否进入黄灯告警区 (≥25°) */
+/* 是否进入黄灯告警区 (|pitch| ≥ 25°, 前后对称) */
 static inline int in_warn_zone(float pitch)
 {
-    return (pitch >= TILT_WARN_ENTER);
+    float abs_p = pitch > 0 ? pitch : -pitch;
+    return (abs_p >= TILT_WARN_ENTER);
 }
 
-/* 是否进入红灯告警区 (≥35°) */
+/* 是否进入红灯告警区 (|pitch| ≥ 35°, 前后对称) */
 static inline int in_alarm_zone(float pitch)
 {
-    return (pitch >= TILT_ALARM_ENTER);
+    float abs_p = pitch > 0 ? pitch : -pitch;
+    return (abs_p >= TILT_ALARM_ENTER);
 }
 
-/* 是否退出黄灯区 (滞回: 低于退出阈值) */
+/* 是否退出黄灯区 (|pitch| ≤ 22°, 滞回) */
 static inline int exit_warn_zone(float pitch)
 {
-    return (pitch <= TILT_WARN_EXIT);
+    float abs_p = pitch > 0 ? pitch : -pitch;
+    return (abs_p <= TILT_WARN_EXIT);
 }
 
-/* 是否退出红灯区到黄灯区 */
+/* 是否退出红灯区到黄灯区 (22° < |pitch| ≤ 32°) */
 static inline int exit_alarm_to_warn(float pitch)
 {
-    return (pitch <= TILT_ALARM_EXIT && pitch > TILT_WARN_EXIT);
+    float abs_p = pitch > 0 ? pitch : -pitch;
+    return (abs_p <= TILT_ALARM_EXIT && abs_p > TILT_WARN_EXIT);
 }
 
-/* 是否退出红灯区到直立区 */
+/* 是否退出红灯区到直立区 (|pitch| ≤ 22°) */
 static inline int exit_alarm_to_stand(float pitch)
 {
-    return (pitch <= TILT_WARN_EXIT);
+    float abs_p = pitch > 0 ? pitch : -pitch;
+    return (abs_p <= TILT_WARN_EXIT);
 }
 
 /* ================================================================
