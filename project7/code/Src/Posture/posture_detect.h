@@ -23,7 +23,7 @@ typedef enum {
 } PostureState_t;
 
 /* ================================================================
- * 阈值配置 (可在此文件修改, 覆盖 main.h 默认值)
+ * 阈值配置 (可在此文件修改, 或在 main.h 中覆盖)
  * ================================================================ */
 
 /* 进入告警的俯仰角阈值 (°) */
@@ -35,7 +35,7 @@ typedef enum {
 #define TILT_ALARM_ENTER    35.0f
 #endif
 
-/* 退出告警阈值 (含滞回3°, 防止边界振荡) */
+/* 退出告警阈值 (含滞回, 防止边界振荡) */
 #ifndef TILT_WARN_EXIT
 #define TILT_WARN_EXIT      22.0f
 #endif
@@ -46,7 +46,25 @@ typedef enum {
 
 /* 直立判定: |pitch| ≤ 此值视为站直 */
 #ifndef POSTURE_STAND_MAX
-#define POSTURE_STAND_MAX   2.0f
+#define POSTURE_STAND_MAX   10.0f
+#endif
+
+/* 低通滤波系数 (0~1, 越小越平滑) */
+#ifndef FILTER_ALPHA
+#define FILTER_ALPHA        0.3f
+#endif
+
+/* 持续计时阈值 */
+#ifndef STAND_STABLE_TIME
+#define STAND_STABLE_TIME   3000    /* 直立稳定3秒 → 绿灯亮 */
+#endif
+
+#ifndef TILT_25_HOLD_TIME
+#define TILT_25_HOLD_TIME   200     /* 25°持续200ms → 黄灯告警 (防晃动) */
+#endif
+
+#ifndef TILT_35_HOLD_TIME
+#define TILT_35_HOLD_TIME   500     /* 35°持续500ms → 红灯告警 */
 #endif
 
 /* ================================================================

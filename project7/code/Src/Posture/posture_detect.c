@@ -7,9 +7,10 @@
  * 状态机:
  *                 ┌──────────────────────────────────────┐
  *                 │                                      │
- *   STRAIGHT ──(│pitch│≤2° 持续3s)──→ STANDING_STABLE    │
+ *   STRAIGHT ──(│pitch│≤10° 持续3s)──→ STANDING_STABLE   │
  *       │              │                     │           │
  *       │  pitch≥25°   │     pitch≥25°       │           │
+ *       │  持续200ms   │     持续200ms       │           │
  *       ▼              │                     │           │
  *   TILT_WARN ◄────────┘                     │           │
  *       │                                     │          │
@@ -23,9 +24,10 @@
  *
  * 防误报措施:
  *   1. 一阶低通滤波 (α = FILTER_ALPHA) — 滤除晃动尖峰
- *   2. 滞回退出 (3°) — 防止阈值边界反复切换
- *   3. 35°需累计 500ms — 瞬时晃动不触发红色告警
- *   4. 直立需累计 3s — 短暂直立不误清除告警
+ *   2. 25°需累计 200ms (TILT_25_HOLD_TIME) — 瞬时晃动不触发黄灯告警
+ *   3. 35°需累计 500ms (TILT_35_HOLD_TIME) — 瞬时晃动不触发红灯告警
+ *   4. 滞回退出 (3°) — 防止阈值边界反复切换
+ *   5. 直立需累计 3s — 短暂直立不误清除告警
  */
 
 #include "posture_detect.h"
@@ -38,19 +40,21 @@ static PostureState_t state;            /* 当前姿态状态 */
 static float         filtered_pitch;    /* 低通滤波后的俯仰角 */
 static uint8_t       filter_inited;     /* 滤波器是否已初始化 */
 
-/* 计时器 */
-static uint32_t stand_timer_ms;         /* 站立累计时间 */
-static uint32_t tilt35_timer_ms;        /* 35°前倾累计时间 */
+/* 持续计时器 */
+static uint32_t stand_timer_ms;         /* 直立累计时间 (→ 绿灯) */
+static uint32_t tilt25_timer_ms;        /* 25°前倾累计时间 (→ 黄灯) */
+static uint32_t tilt35_timer_ms;        /* 35°前倾累计时间 (→ 红灯) */
 
 /* ================================================================
  * 初始化
  * ================================================================ */
 void Posture_Init(void)
 {
-    state          = POSTURE_STRAIGHT;
-    filtered_pitch = 0.0f;
-    filter_inited  = 0;
-    stand_timer_ms = 0;
+    state           = POSTURE_STRAIGHT;
+    filtered_pitch  = 0.0f;
+    filter_inited   = 0;
+    stand_timer_ms  = 0;
+    tilt25_timer_ms = 0;
     tilt35_timer_ms = 0;
 }
 
@@ -58,19 +62,19 @@ void Posture_Init(void)
  * 判断辅助函数
  * ================================================================ */
 
-/* 是否处于直立姿态 */
+/* 是否处于直立姿态 (|pitch| < POSTURE_STAND_MAX) */
 static inline int is_standing(float pitch)
 {
     return (pitch >= -POSTURE_STAND_MAX && pitch <= POSTURE_STAND_MAX);
 }
 
-/* 是否处于黄灯告警区 (带滞回) */
+/* 是否进入黄灯告警区 (≥25°) */
 static inline int in_warn_zone(float pitch)
 {
     return (pitch >= TILT_WARN_ENTER);
 }
 
-/* 是否处于红灯告警区 (带滞回) */
+/* 是否进入红灯告警区 (≥35°) */
 static inline int in_alarm_zone(float pitch)
 {
     return (pitch >= TILT_ALARM_ENTER);
@@ -82,7 +86,7 @@ static inline int exit_warn_zone(float pitch)
     return (pitch <= TILT_WARN_EXIT);
 }
 
-/* 是否退出红灯区到黄灯区 (低于红灯退出阈值, 但高于黄灯退出阈值) */
+/* 是否退出红灯区到黄灯区 */
 static inline int exit_alarm_to_warn(float pitch)
 {
     return (pitch <= TILT_ALARM_EXIT && pitch > TILT_WARN_EXIT);
@@ -120,28 +124,39 @@ void Posture_Update(float pitch, uint16_t dt_ms)
             stand_timer_ms += dt_ms;
             if (stand_timer_ms >= STAND_STABLE_TIME) {
                 state = POSTURE_STANDING_STABLE;
-                stand_timer_ms = 0;
+                stand_timer_ms  = 0;
+                tilt25_timer_ms = 0;
+                tilt35_timer_ms = 0;
                 break;
             }
         } else {
             stand_timer_ms = 0;
         }
 
-        /* 检查前倾告警 */
+        /* 检查前倾: 35° 优先级高于 25° */
         if (in_alarm_zone(fp)) {
+            /* ≥35°: 累计 500ms → 红灯 */
+            tilt25_timer_ms = 0;
             tilt35_timer_ms += dt_ms;
             if (tilt35_timer_ms >= TILT_35_HOLD_TIME) {
                 state = POSTURE_TILT_ALARM;
                 tilt35_timer_ms = 0;
-                stand_timer_ms = 0;
+                stand_timer_ms  = 0;
                 break;
             }
         } else if (in_warn_zone(fp)) {
+            /* 25°~35°: 累计 200ms → 黄灯 (防晃动) */
             tilt35_timer_ms = 0;
-            state = POSTURE_TILT_WARN;
-            stand_timer_ms = 0;
-            break;
+            tilt25_timer_ms += dt_ms;
+            if (tilt25_timer_ms >= TILT_25_HOLD_TIME) {
+                state = POSTURE_TILT_WARN;
+                tilt25_timer_ms = 0;
+                stand_timer_ms  = 0;
+                break;
+            }
         } else {
+            /* <25°: 未达告警, 清零所有前倾计时 */
+            tilt25_timer_ms = 0;
             tilt35_timer_ms = 0;
         }
         break;
@@ -151,6 +166,7 @@ void Posture_Update(float pitch, uint16_t dt_ms)
         if (!is_standing(fp)) {
             /* 偏离直立 */
             if (in_alarm_zone(fp)) {
+                tilt25_timer_ms = 0;
                 tilt35_timer_ms += dt_ms;
                 if (tilt35_timer_ms >= TILT_35_HOLD_TIME) {
                     state = POSTURE_TILT_ALARM;
@@ -159,10 +175,15 @@ void Posture_Update(float pitch, uint16_t dt_ms)
                 }
             } else if (in_warn_zone(fp)) {
                 tilt35_timer_ms = 0;
-                state = POSTURE_TILT_WARN;
-                break;
+                tilt25_timer_ms += dt_ms;
+                if (tilt25_timer_ms >= TILT_25_HOLD_TIME) {
+                    state = POSTURE_TILT_WARN;
+                    tilt25_timer_ms = 0;
+                    break;
+                }
             } else {
                 /* 微偏但未达告警, 回到计时状态 */
+                tilt25_timer_ms = 0;
                 tilt35_timer_ms = 0;
                 state = POSTURE_STRAIGHT;
                 stand_timer_ms = 0;
@@ -177,6 +198,7 @@ void Posture_Update(float pitch, uint16_t dt_ms)
             tilt35_timer_ms += dt_ms;
             if (tilt35_timer_ms >= TILT_35_HOLD_TIME) {
                 state = POSTURE_TILT_ALARM;
+                tilt25_timer_ms = 0;
                 tilt35_timer_ms = 0;
                 break;
             }
@@ -187,7 +209,8 @@ void Posture_Update(float pitch, uint16_t dt_ms)
         /* 退出黄灯? (滞回) */
         if (exit_warn_zone(fp)) {
             state = POSTURE_STRAIGHT;
-            stand_timer_ms = 0;
+            stand_timer_ms  = 0;
+            tilt25_timer_ms = 0;
             tilt35_timer_ms = 0;
             break;
         }
@@ -196,14 +219,15 @@ void Posture_Update(float pitch, uint16_t dt_ms)
     case POSTURE_TILT_ALARM:
         /* 退出红灯? */
         if (exit_alarm_to_stand(fp)) {
-            /* 直接回到直立 */
             state = POSTURE_STRAIGHT;
-            stand_timer_ms = 0;
+            stand_timer_ms  = 0;
+            tilt25_timer_ms = 0;
             tilt35_timer_ms = 0;
             break;
         } else if (exit_alarm_to_warn(fp)) {
-            /* 降级到黄灯 */
+            /* 降级到黄灯 (无需重新计时, 已在告警区) */
             state = POSTURE_TILT_WARN;
+            tilt25_timer_ms = 0;
             tilt35_timer_ms = 0;
             break;
         }

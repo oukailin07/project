@@ -44,7 +44,7 @@
  * 姿态检测阈值 (移植时可根据实际需求调整)
  * ================================================================ */
 
-#define POSTURE_STAND_MAX       2.0f    /* 直立判定最大角度(°) — 站直为0° */
+#define POSTURE_STAND_MAX       10.0f   /* 直立判定最大角度(°) — |pitch|<10°视为站直 */
 #define POSTURE_TILT_25         25.0f   /* 偏离竖直方向25°告警阈值 */
 #define POSTURE_TILT_35         35.0f   /* 偏离竖直方向35°告警阈值 */
 #define POSTURE_HYSTERESIS      2.0f    /* 滞回(°): 离开告警区需回退2° */
@@ -55,7 +55,8 @@
  * ================================================================ */
 
 #define STAND_STABLE_TIME       3000    /* 直立稳定3秒 → 绿灯亮 */
-#define TILT_35_HOLD_TIME       500     /* 35°持续0.5秒 → 红灯告警 */
+#define TILT_25_HOLD_TIME       150     /* 25°持续200ms → 黄灯告警 (防晃动误报) */
+#define TILT_35_HOLD_TIME       150     /* 35°持续200ms秒 → 红灯告警 */
 #define MAIN_LOOP_PERIOD        10      /* 主循环周期 10ms (100Hz) */
 
 /* --- LED 闪烁周期 --- */
